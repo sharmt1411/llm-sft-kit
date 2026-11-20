@@ -102,12 +102,20 @@ def main() -> int:
     _write_if_needed(root / "configs" / "base.yaml", base_yaml, args.force)
 
     smoke_yaml = (
-        "# 2-step end-to-end smoke test overrides\n"
+        "# 2-step lightweight end-to-end smoke test overrides\n"
+        "model:\n"
+        "  max_seq_length: 1024\n"
+        "\n"
+        "data:\n"
+        "  max_seq_length: 1024\n"
+        "\n"
         "training:\n"
         "  max_steps: 2\n"
+        "  per_device_train_batch_size: 1\n"
+        "  gradient_accumulation_steps: 2\n"
         "  logging_steps: 1\n"
-        "  eval_steps: 1\n"
-        "  save_steps: 1\n"
+        "  eval_steps: 2\n"
+        "  save_steps: 2\n"
     )
     _write_if_needed(root / "configs" / "exp_0001_smoke_test.yaml", smoke_yaml, args.force)
 

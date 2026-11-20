@@ -39,6 +39,15 @@ import torch
 import yaml
 
 try:
+    import unsloth  # Must be imported before transformers, peft, trl for full patching
+    from unsloth import FastLanguageModel
+    _UNSLOTH_IMPORT_ERR = None
+except Exception as _unsloth_exc:
+    unsloth = None
+    FastLanguageModel = None
+    _UNSLOTH_IMPORT_ERR = _unsloth_exc
+
+try:
     import transformers
     from transformers import (
         AutoModelForCausalLM,
@@ -206,13 +215,8 @@ def collect_meta_info(config: dict, start_time: str) -> dict:
         "transformers": getattr(transformers, "__version__", "not_installed") if transformers else "not_installed",
         "peft": getattr(peft, "__version__", "not_installed") if peft else "not_installed",
         "trl": getattr(trl, "__version__", "not_installed") if trl else "not_installed",
+        "unsloth": getattr(unsloth, "__version__", "installed") if unsloth else "not_installed",
     }
-    try:
-        import unsloth
-
-        libs["unsloth"] = getattr(unsloth, "__version__", "installed")
-    except Exception:
-        libs["unsloth"] = "not_installed"
 
     return {
         "git_commit": get_git_commit(),
@@ -286,6 +290,28 @@ def setup_experiment_run(config: dict, exp_name: str) -> Path:
     return run_dir
 
 
+def _resolve_offload_layers(model_name: str, model_cfg: dict, total_vram_gb: float) -> int | str | None:
+    """Resolve `offload_layers` supporting 'auto', explicit ints, disable flags, and >=27B auto-offload on <24.5GB GPUs."""
+    raw = model_cfg.get("offload_layers")
+    if raw is not None:
+        if isinstance(raw, bool):
+            return "auto" if raw else None
+        if isinstance(raw, str):
+            val = raw.strip().lower()
+            if val == "auto":
+                return "auto"
+            if val in ("", "none", "false", "off"):
+                return None
+            layers = int(val)
+            return layers if layers > 0 else None
+        layers = int(raw)
+        return layers if layers > 0 else None
+
+    if any(tag in str(model_name).lower() for tag in ("27b", "32b", "35b")) and 0.0 < total_vram_gb < 24.5:
+        return "auto"
+    return None
+
+
 def load_model_and_tokenizer(config: dict):
     """Load base model & tokenizer via Unsloth or fallback to Transformers + BitsAndBytes."""
     model_cfg = config.get("model", {})
@@ -300,15 +326,15 @@ def load_model_and_tokenizer(config: dict):
 
     print(f"Loading model: {model_name} (max_seq_length={max_seq_length}, 4bit={load_in_4bit})")
     try:
-        from unsloth import FastLanguageModel
+        if FastLanguageModel is None:
+            raise ImportError(f"Unsloth not available: {_UNSLOTH_IMPORT_ERR}")
 
-        offload_kwargs = {}
         total_vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3) if torch.cuda.is_available() else 0.0
-        offload_layers = model_cfg.get("offload_layers")
-        if offload_layers is not None:
-            offload_kwargs["offload_layers"] = int(offload_layers)
-        elif any(tag in str(model_name).lower() for tag in ("27b", "32b", "35b")) and total_vram_gb < 20.0:
-            offload_kwargs["offload_layers"] = 30
+        offload_kwargs = {}
+        resolved_offload = _resolve_offload_layers(model_name, model_cfg, total_vram_gb)
+        if resolved_offload is not None:
+            offload_kwargs["offload_layers"] = resolved_offload
+            print(f"Using Unsloth offload_layers={resolved_offload} (VRAM={total_vram_gb:.2f}GB)")
 
         model, tokenizer = FastLanguageModel.from_pretrained(
             model_name=model_name,
@@ -363,8 +389,6 @@ def setup_lora(model, config: dict):
     )
 
     if getattr(model, "_is_unsloth", False):
-        from unsloth import FastLanguageModel
-
         model = FastLanguageModel.get_peft_model(
             model,
             r=lora_r,

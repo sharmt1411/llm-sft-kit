@@ -2,9 +2,10 @@
 
 Distilled cross-experiment rules for LLM LoRA/SFT workloads:
 
-1. **T4 GPU (Turing sm_75) & BF16**:
-   - T4 does NOT support native `bfloat16`. Always auto-fallback to `float16` when `torch.cuda.is_bf16_supported()` is false.
-   - Training >= 27B models on a free 15GB T4 with high CPU offload causes OOM/RAM deadlock. Use >= 40GB VRAM (A100) or >= 51GB High-RAM with explicit `offload_layers` only for lightweight checks.
+1. **T4 / L4 GPU & BF16 / `offload_layers`**:
+   - T4 (Turing `sm_75`) does NOT support native `bfloat16`. Always auto-fallback to `float16` when `torch.cuda.is_bf16_supported()` is false.
+   - Training >= 27B models on a free 15GB T4 with high CPU offload causes OOM/RAM deadlock. On L4 (~22GB VRAM) or 24GB GPUs, 27B–35B 4-bit models still exceed VRAM during loading/training and require `offload_layers: "auto"` (plus High-RAM system memory) to avoid bitsandbytes CPU-spill errors; use >= 40GB VRAM (A100) for full-speed runs.
+   - Always `import unsloth` before `transformers`, `peft`, and `trl` so all memory/kernel patches take effect.
 2. **Inference Memory-Bandwidth Wall**:
    - Autoregressive token generation at batch=1 is memory-bandwidth bound. For 4-bit 27B (~15GB weights), L4 (300 GB/s) physically caps around ~4–5 tok/s even with zero CPU offload. Do not misdiagnose bandwidth ceilings as CPU offloading without checking `hf_device_map` and VRAM allocation.
 3. **TRL / Transformers Compatibility**:
