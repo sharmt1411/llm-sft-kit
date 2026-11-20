@@ -30,7 +30,7 @@ Use this workflow whenever running, monitoring, or stopping training/evaluation 
    - 修改 `mcp_config.json` 后，提示用户**重载/重启 `sft-colab` MCP 服务**使新环境变量生效（新 Edge Profile 首次需登录一次 Google 账号）。
 
 ## 1. 训练环境与连接顺序
-
+0. 首次项目连接：当项目初始化时，由于未建立项目项目笔记本，使用`open_colab_browser_connection`打开默认网址，请求用户在该实例浏览器中登录账户创建笔记本，并引导配置相应的密钥（如果账号未配置需要配置，如果账号配置过需要点开密钥授权新笔记本。）。建立后将笔记本地址记录到`rules/AGENTS.md` 中的`COLAB_NOTEBOOK_URL`。（由于本mcp使用自定义profile配置浏览器，用户使用默认浏览器创建后，在连接时打开新的浏览器仍需要重复登录，所以直接通过连接打开默认网页等待用户操作。）
 1. **浏览器层连接**：调用 `open_colab_browser_connection` 并传入插件 `rules/AGENTS.md` 中记录的完整 `COLAB_NOTEBOOK_URL`。**在连接成功前禁止调用其他 `sft-colab` 工具**；若连接失败应重连，多次失败须提示用户手动介入（如登录账号或打开目标 Notebook）。
 2. **算力层连接与硬件切换**：
    - 切换运行时规格（如训练用 A100、推理评测切换 T4/L4 节省成本）与挂载 Google Drive 均需由用户手动操作确认。
@@ -41,11 +41,12 @@ Use this workflow whenever running, monitoring, or stopping training/evaluation 
 
 1. **双向同步配置**：
    - 本地电脑使用 Google Drive 桌面端同步项目目录（云端映射路径通常形如 `/content/drive/Othercomputers/<主机名>/<项目名>`）。
-   - 用户在 Colab 中挂载云盘（`drive.mount('/content/drive')`）后，将该挂载路径写入插件 `rules/AGENTS.md` 的 `COLAB_DRIVE_DIR` 与 `configs/base.yaml` 的 `project.colab_dir`。
+   - 用户在 Colab 中挂载云盘（`drive.mount('/content/drive')`）后，将该挂载路径写入插件 `rules/AGENTS.md` 的 `COLAB_DRIVE_DIR` 与 `configs/base.yaml` 的 `project.colab_dir`。具体文件夹可以在云端搜索同名项目文件夹，如果未发现可以向用户确认。
    - 脚本修改与数据准备可在本地完成并自动同步至云端；训练产出的 `runs/` 与日志会自动回传本地。
 2. **严防同步盘污染与卡死**：
    - `HF_HOME`、`TORCH_HOME`、`UNSLOTH_COMPILE_LOCATION`、`TRITON_CACHE_DIR` 必须重定向到 `/tmp` 或 `/root/.cache`。
    - 训练中的高频中间 step checkpoint 必须先写入 `/content/temp_training`，训完再保存 `checkpoints/best` 与 `checkpoints/last` 到同步目录。
+3. Google drive 同笔记本每次连接新实例后都需要授权。因此建议放在单元格最上并在每次连接实例后提醒用户授权。
 
 ## 3. 授权与安全规范
 
