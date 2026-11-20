@@ -38,5 +38,23 @@ llm-sft-kit/
   ```bash
   git clone https://github.com/sharmt1411/llm-sft-kit.git ~/.gemini/config/plugins/llm-sft-kit
   ```
-- **方式二：项目级挂载（适合单项目使用或团队共享）**
-  将插件目录直接克隆或复制到目标项目的 `.agents/plugins/llm-sft-kit/` 下即可自动发现加载（Windows 下请使用实目录，勿使用目录联接）。
+- **方式二：项目级挂载（在目标项目根目录执行，已有 `.agents/plugins` 目录直接复用，没有则新建）**
+  - **macOS / Linux (`bash`)**：
+    ```bash
+    mkdir -p .agents/plugins
+    if [ -d .agents/plugins/llm-sft-kit/.git ]; then
+      git -C .agents/plugins/llm-sft-kit pull --ff-only
+    elif [ ! -d .agents/plugins/llm-sft-kit ]; then
+      git clone https://github.com/sharmt1411/llm-sft-kit.git .agents/plugins/llm-sft-kit
+    fi
+    ```
+  - **Windows (`PowerShell`)**：
+    ```powershell
+    New-Item -ItemType Directory -Force .agents\plugins | Out-Null
+    if (Test-Path .agents\plugins\llm-sft-kit\.git) {
+      git -C .agents\plugins\llm-sft-kit pull --ff-only
+    } elseif (-not (Test-Path .agents\plugins\llm-sft-kit)) {
+      git clone https://github.com/sharmt1411/llm-sft-kit.git .agents\plugins\llm-sft-kit
+    }
+    ```
+  - Windows 下请使用实目录，勿使用目录联接（`mklink /J`）。若后续不想把插件副本提交进目标项目 Git，可在目标项目 `.gitignore` 中添加 `.agents/plugins/`。
