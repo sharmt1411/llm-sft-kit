@@ -1,0 +1,11 @@
+{
+  "eval-platform-gate": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "python scripts/check_runtime_env.py",
+        "timeout": 5
+      }
+    ]
+  }
+}

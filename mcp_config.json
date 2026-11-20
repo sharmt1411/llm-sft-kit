@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "sft-colab": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/sharmt1411/better_colab_MCP.git",
+        "colab-mcp",
+        "--core-only"
+      ],
+      "env": {
+        "COLAB_MCP_EDGE_CDP_PORT": "9333",
+        "COLAB_MCP_EDGE_URL_CONTAINS": "colab.research.google.com"
+      }
+    }
+  }
+}

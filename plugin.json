@@ -1,0 +1,13 @@
+{
+  "name": "llm-sft-kit",
+  "displayName": "LLM SFT Kit",
+  "version": "0.1.0",
+  "description": "End-to-end LLM LoRA/SFT engineering kit: reproducible project scaffolding, stratified data prep, pure-reply loss training, Colab GPU scheduling, OpenAI SSE serving, and eval-platform integration.",
+  "author": "TAnGx1411",
+  "repository": "https://github.com/sharmt1411/llm-sft-kit",
+  "suggestedPrompts": [
+    "Initialize a new reproducible LLM SFT project in this workspace",
+    "Prepare a versioned dataset and launch an SFT training run on Colab",
+    "Deploy the fine-tuned LoRA adapter as an SSE endpoint and connect evalctl"
+  ]
+}
