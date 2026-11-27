@@ -5,7 +5,7 @@ description: 通过统一命令行工具 evalctl（或 python -m cli / python ba
 
 # Eval Platform Agent CLI 技能指南 (`evalctl`)
 
-本指南面向本机 Coding Agent，采用**渐进式披露**方式按需探索并调用平台全部 8 大能力模块（61 条命令）。
+本指南面向本机 Coding Agent，采用**渐进式披露**方式按需探索并调用平台全部 8 大能力模块（60 条命令）。
 
 ## 一、环境检测、下载启动与路径语义
 
@@ -70,7 +70,7 @@ evalctl [全局参数] <group> <command> [子命令参数]
    evalctl benchmark side-by-side --help
    ```
 3. **Profile 边界速览**：
-   - 内置 5 套 Profile：`full`（默认全开，61 条）、`safe`（禁用删除与重置）、`readonly`（仅只读查询与组装预览）、`eval-loop`（评测调优闭环，仅放行 31 条命令）、`flywheel-loop`（对弈修复闭环）。
+   - 内置 5 套 Profile：`full`（默认全开，60 条）、`safe`（禁用删除与重置）、`readonly`（仅只读查询与组装预览）、`eval-loop`（评测调优闭环，仅放行 31 条命令）、`flywheel-loop`（对弈修复闭环）。
    - ⚠️ **Profile 常见踩坑**：`eval-loop` **不包含** `model.create` / `model.update`（及 `simulation` / `flywheel`）。若需要注册模型或修改远程推理地址，必须使用 `full` 或 `safe`，否则会报 `POLICY_DENIED`（退出码 `3`）。
    - 可通过全局 `--profile <name>` 切换；开启破坏性操作二次确认时补加全局 `--yes`。
 
@@ -155,15 +155,18 @@ evalctl --timeout 0 flywheel judge <sample_id> --rule-id demo_after_sales --judg
 evalctl --timeout 0 flywheel remediate <sample_id> --remediate-model-id vertex-gemini-flash-judge
 evalctl flywheel slices-get <sample_id>
 
-# 4. 导出黄金 SFT 训练集（与留出评测集天然防泄漏隔离）或导出为 Benchmark 评测集
+# 4. 导出黄金 SFT 训练集（仅允许达标/人工放行样本，按 active_version 导出，默认排除已导出评测集的留出同源对话并启用去重防稀释）或导出为 Benchmark 评测集
 #    注：如需导出采集到的 assistant 思考链用于 CoT 蒸馏，显式加 --inject-thinking（默认不导出）
 #    注：replace 修复仅改写 content 不会重生成 thinking，强 CoT 蒸馏建议优先筛选 GOLD_PASS 样本导出：
 #        evalctl flywheel export-selected --sample-id <id1> --sample-id <id2> --inject-thinking
-evalctl flywheel export-gold --rule-id demo_after_sales --version-tag v1.1
+#    去重防稀释参数：--enable-dedup/--no-dedup、--cluster-quota <K>（训练默认20/评测默认5）、--sim-threshold <θ>（默认0.82）、--target-count <N>
+#    SFT 导出还支持：--mode create|append、--target-dataset-id <id>、--no-exclude-benchmark-exported（显式放行时将把其既有评测题改为普通题）
+#    评测切题导出支持：--reserve-for-training（预留后续进训练集，主动标为普通题）；已进过训练集的样本切题时将自动标为普通题
+evalctl flywheel export-gold --rule-id demo_after_sales --version-tag v1.1 --cluster-quota 20 --sim-threshold 0.82
 evalctl flywheel export-gold --rule-id demo_after_sales --version-tag v1.1_cot --inject-thinking
-evalctl flywheel export-benchmark <sample_id> --dataset-id fw_eval_v1 --name "飞轮回归评测集"
+evalctl flywheel export-benchmark <sample_id> --dataset-id fw_eval_v1 --name "飞轮回归评测集" --cluster-quota 5
 
-# 5. 批量飞轮治理（初检->AI修复->二检->gold/discarded；--input-file-path 为服务端路径）
+# 5. 批量飞轮治理（初检->AI修复->二检->gold/discarded；--input-file-path 为服务端路径；默认入池 Upsert 并对黄金集去重）
 evalctl --timeout 0 flywheel batch --rule-id demo_after_sales --input-file-path data/runs/raw.jsonl \
   --judge-model-id vertex-gemini-flash-judge --workers 1 --wait --wait-timeout 3600
 
@@ -184,11 +187,14 @@ evalctl --out data/runs/inspect_report.json flywheel inspect-report <task_id>
 # 1. 查看历史基准模型线与分类分布
 evalctl dataset filter-options demo_benchmark
 
-# 2. 试算并另存为聚焦薄弱错题的新评测集
+# 2. 试算并另存为聚焦薄弱错题的新评测集（append 模式自动开启四步去重，可选 --enable-dedup/--cluster-quota/--sim-threshold/--target-count）
 evalctl dataset export-preview demo_benchmark --export-scope failed_only --model-line gpt-oss-20b
 evalctl dataset export demo_benchmark \
   --export-scope failed_only --model-line gpt-oss-20b \
   --export-target save_dataset --target-dataset-id demo_failed_focus
+
+# 3. 外部数据集追加导入（append 模式默认去重，同步维护 .dedup_cache.json；--no-dedup 可显式关闭）
+evalctl dataset import --dataset-id ext_eval --dataset-type benchmark --mode append --file raw_eval.jsonl --cluster-quota 5
 ```
 
 ---
